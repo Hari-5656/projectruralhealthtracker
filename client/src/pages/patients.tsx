@@ -13,6 +13,7 @@ import {
   Eye,
   Phone,
   Calendar,
+  Users,
 } from "lucide-react";
 
 export default function Patients() {

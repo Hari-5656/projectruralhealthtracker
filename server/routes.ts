@@ -5,12 +5,28 @@ import session from "express-session";
 import MemoryStore from "memorystore";
 import bcrypt from "bcryptjs";
 import { insertUserSchema, insertPatientSchema, insertVaccinationSchema, insertAppointmentSchema } from "@shared/schema";
+import "./types";
 
 // Simple auth middleware
-const requireAuth = (req: any, res: any, next: any) => {
+const requireAuth = async (req: any, res: any, next: any) => {
+  console.log('Session check:', { 
+    sessionId: req.sessionID, 
+    userId: req.session?.userId,
+    hasSession: !!req.session 
+  });
+  
   if (!req.session?.userId) {
     return res.status(401).json({ message: "Unauthorized" });
   }
+  
+  // Verify user still exists and is active
+  const user = await storage.getUser(req.session.userId);
+  if (!user || !user.isActive) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  req.user = user;
   next();
 };
 
@@ -36,7 +52,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     store: new sessionStore({
       checkPeriod: 86400000 // prune expired entries every 24h
     }),
-    resave: false,
+    resave: true,
     saveUninitialized: false,
     cookie: {
       secure: false, // set to true in production with HTTPS
@@ -75,6 +91,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       req.session.userId = newUser.id;
+      console.log('Setting session userId:', newUser.id);
+      
+      req.session.save((err) => {
+        if (err) {
+          console.error('Session save error:', err);
+        } else {
+          console.log('Session saved successfully with userId:', req.session.userId);
+        }
+      });
+      
       const { password: _, ...userWithoutPassword } = newUser;
       res.json({ user: userWithoutPassword });
     } catch (error) {
@@ -102,6 +128,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       req.session.userId = user.id;
+      req.session.save((err) => {
+        if (err) console.error('Session save error:', err);
+      });
       const { password: _, ...userWithoutPassword } = user;
       res.json({ user: userWithoutPassword });
     } catch (error) {

@@ -175,16 +175,16 @@ export default function PatientDetail() {
             <CardContent className="space-y-4">
               <div className="flex items-center space-x-3">
                 <div className="w-16 h-16 bg-medical-blue rounded-full flex items-center justify-center text-white text-xl font-medium">
-                  {patient.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                  {patient?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'P'}
                 </div>
                 <div>
-                  <h3 className="font-medium text-lg">{patient.name}</h3>
-                  <Badge className={`text-xs ${patient.ageGroup === 'infant' ? 'bg-blue-100 text-blue-800' : 
-                    patient.ageGroup === 'child' ? 'bg-green-100 text-green-800' :
-                    patient.ageGroup === 'pregnant' ? 'bg-pink-100 text-pink-800' :
-                    patient.ageGroup === 'elderly' ? 'bg-purple-100 text-purple-800' :
+                  <h3 className="font-medium text-lg">{patient?.name || 'Unknown Patient'}</h3>
+                  <Badge className={`text-xs ${patient?.ageGroup === 'infant' ? 'bg-blue-100 text-blue-800' : 
+                    patient?.ageGroup === 'child' ? 'bg-green-100 text-green-800' :
+                    patient?.ageGroup === 'pregnant' ? 'bg-pink-100 text-pink-800' :
+                    patient?.ageGroup === 'elderly' ? 'bg-purple-100 text-purple-800' :
                     'bg-gray-100 text-gray-800'}`}>
-                    {patient.ageGroup}
+                    {patient?.ageGroup || 'Unknown'}
                   </Badge>
                 </div>
               </div>
@@ -195,16 +195,16 @@ export default function PatientDetail() {
                 <div className="flex items-center space-x-2 text-sm">
                   <Calendar className="h-4 w-4 text-gray-400" />
                   <span className="text-gray-600">Age:</span>
-                  <span>{calculateAge(patient.dateOfBirth)} years</span>
+                  <span>{calculateAge(patient?.dateOfBirth)} years</span>
                 </div>
 
                 <div className="flex items-center space-x-2 text-sm">
                   <User className="h-4 w-4 text-gray-400" />
                   <span className="text-gray-600">Gender:</span>
-                  <span>{patient.gender || "N/A"}</span>
+                  <span>{patient?.gender || "N/A"}</span>
                 </div>
 
-                {patient.phone && (
+                {patient?.phone && (
                   <div className="flex items-center space-x-2 text-sm">
                     <Phone className="h-4 w-4 text-gray-400" />
                     <span className="text-gray-600">Phone:</span>
@@ -212,7 +212,7 @@ export default function PatientDetail() {
                   </div>
                 )}
 
-                {patient.address && (
+                {patient?.address && (
                   <div className="flex items-center space-x-2 text-sm">
                     <MapPin className="h-4 w-4 text-gray-400" />
                     <span className="text-gray-600">Address:</span>
@@ -223,7 +223,7 @@ export default function PatientDetail() {
             </CardContent>
           </Card>
 
-          {patient.guardianName && (
+          {patient?.guardianName && (
             <Card>
               <CardHeader>
                 <CardTitle>Guardian Information</CardTitle>
@@ -233,7 +233,7 @@ export default function PatientDetail() {
                   <p className="text-sm text-gray-600">Guardian Name</p>
                   <p className="font-medium">{patient.guardianName}</p>
                 </div>
-                {patient.guardianPhone && (
+                {patient?.guardianPhone && (
                   <div>
                     <p className="text-sm text-gray-600">Guardian Phone</p>
                     <p className="font-medium">{patient.guardianPhone}</p>
@@ -243,7 +243,7 @@ export default function PatientDetail() {
             </Card>
           )}
 
-          {(patient.medicalHistory || patient.allergies) && (
+          {(patient?.medicalHistory || patient?.allergies) && (
             <Card>
               <CardHeader>
                 <CardTitle>Medical Information</CardTitle>
