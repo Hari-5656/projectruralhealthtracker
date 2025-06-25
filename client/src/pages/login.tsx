@@ -105,6 +105,19 @@ export default function Login() {
                 "Sign In"
               )}
             </Button>
+            
+            <div className="flex justify-between items-center text-sm">
+              <Button variant="ghost" className="text-medical-blue hover:text-blue-700 p-0">
+                Forgot Password?
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="text-medical-blue hover:text-blue-700 p-0"
+                onClick={() => setLocation("/signup")}
+              >
+                Need an account?
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>

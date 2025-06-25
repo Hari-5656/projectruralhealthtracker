@@ -46,6 +46,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // Auth routes
+  app.post("/api/auth/signup", async (req, res) => {
+    try {
+      const { username, password, name, email, phone, isFirstUser } = req.body;
+      
+      if (!username || !password || !name) {
+        return res.status(400).json({ message: "Username, password, and name are required" });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      // Check if this is the first user (make them admin)
+      const allUsers = await storage.getAllUsers();
+      const role = allUsers.length === 0 || isFirstUser ? 'admin' : 'health_worker';
+
+      const newUser = await storage.createUser({
+        username,
+        password,
+        name,
+        email: email || null,
+        phone: phone || null,
+        role,
+        isActive: true,
+      });
+
+      req.session.userId = newUser.id;
+      const { password: _, ...userWithoutPassword } = newUser;
+      res.json({ user: userWithoutPassword });
+    } catch (error) {
+      console.error("Signup error:", error);
+      res.status(500).json({ message: "Signup failed" });
+    }
+  });
+
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
@@ -93,6 +130,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get user error:", error);
       res.status(500).json({ message: "Failed to get user" });
+    }
+  });
+
+  app.get("/api/auth/setup", async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      res.json({ needsSetup: allUsers.length === 0 });
+    } catch (error) {
+      console.error("Setup check error:", error);
+      res.status(500).json({ message: "Failed to check setup status" });
     }
   });
 

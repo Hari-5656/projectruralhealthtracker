@@ -4,12 +4,14 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
+import { useSetup } from "@/hooks/useSetup";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 
 // Pages
 import Login from "@/pages/login";
+import Signup from "@/pages/signup";
 import Dashboard from "@/pages/dashboard";
 import Patients from "@/pages/patients";
 import PatientNew from "@/pages/patient-new";
@@ -37,9 +39,10 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
 }
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { needsSetup, isLoading: setupLoading } = useSetup();
 
-  if (isLoading) {
+  if (authLoading || setupLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-medical-blue"></div>
@@ -51,7 +54,8 @@ function Router() {
     return (
       <Switch>
         <Route path="/login" component={Login} />
-        <Route component={Login} />
+        <Route path="/signup" component={Signup} />
+        <Route component={needsSetup ? Signup : Login} />
       </Switch>
     );
   }
