@@ -43,6 +43,7 @@ export interface IStorage {
   
   // Vaccination operations
   getVaccinationsByPatient(patientId: number): Promise<Vaccination[]>;
+  getAllVaccinations(): Promise<Vaccination[]>;
   getVaccination(id: number): Promise<Vaccination | undefined>;
   createVaccination(vaccination: InsertVaccination): Promise<Vaccination>;
   updateVaccination(id: number, updates: Partial<InsertVaccination>): Promise<Vaccination>;
@@ -189,6 +190,37 @@ export class DatabaseStorage implements IStorage {
       .from(vaccinations)
       .where(eq(vaccinations.patientId, patientId))
       .orderBy(desc(vaccinations.scheduledDate));
+  }
+
+  async getAllVaccinations(): Promise<any[]> {
+    return await db
+      .select({
+        id: vaccinations.id,
+        patientId: vaccinations.patientId,
+        vaccineId: vaccinations.vaccineId,
+        doseNumber: vaccinations.doseNumber,
+        scheduledDate: vaccinations.scheduledDate,
+        administeredDate: vaccinations.administeredDate,
+        status: vaccinations.status,
+        notes: vaccinations.notes,
+        administeredBy: vaccinations.administeredBy,
+        createdAt: vaccinations.createdAt,
+        patient: {
+          id: patients.id,
+          name: patients.name,
+          patientId: patients.patientId,
+          phone: patients.phone,
+        },
+        vaccine: {
+          id: vaccines.id,
+          name: vaccines.name,
+          description: vaccines.description,
+        },
+      })
+      .from(vaccinations)
+      .leftJoin(patients, eq(vaccinations.patientId, patients.id))
+      .leftJoin(vaccines, eq(vaccinations.vaccineId, vaccines.id))
+      .orderBy(desc(vaccinations.createdAt));
   }
 
   async getVaccination(id: number): Promise<Vaccination | undefined> {

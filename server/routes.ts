@@ -406,6 +406,193 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Report generation and download endpoints
+  app.get("/api/reports/patients", requireAuth, async (req, res) => {
+    try {
+      const { format = 'csv', period = 'all' } = req.query;
+      const patients = await storage.getAllPatients(1000, 0);
+      
+      if (format === 'csv') {
+        const csvHeader = 'Patient ID,Name,Date of Birth,Gender,Phone,Address,Age Group,Date Registered\n';
+        const csvData = patients.map(p => {
+          const age = p.dateOfBirth ? Math.floor((new Date().getTime() - new Date(p.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 'N/A';
+          return `${p.patientId},"${p.name}","${p.dateOfBirth || 'N/A'}","${p.gender || 'N/A'}","${p.phone || 'N/A'}","${p.address || 'N/A'}","${p.ageGroup}","${p.createdAt}"`;
+        }).join('\n');
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="patients_report.csv"');
+        res.send(csvHeader + csvData);
+      } else {
+        res.json(patients);
+      }
+    } catch (error) {
+      console.error("Generate patients report error:", error);
+      res.status(500).json({ message: "Failed to generate patients report" });
+    }
+  });
+
+  app.get("/api/reports/vaccinations", requireAuth, async (req, res) => {
+    try {
+      const { format = 'csv', period = 'all' } = req.query;
+      const vaccinations = await storage.getAllVaccinations();
+      
+      if (format === 'csv') {
+        const csvHeader = 'Patient ID,Patient Name,Vaccine,Dose Number,Scheduled Date,Administered Date,Status,Notes\n';
+        const csvData = vaccinations.map((v: any) => 
+          `${v.patient?.patientId || 'N/A'},"${v.patient?.name || 'N/A'}","${v.vaccine?.name || 'N/A'}",${v.doseNumber},"${v.scheduledDate || 'N/A'}","${v.administeredDate || 'N/A'}","${v.status}","${v.notes || 'N/A'}"`
+        ).join('\n');
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="vaccinations_report.csv"');
+        res.send(csvHeader + csvData);
+      } else {
+        res.json(vaccinations);
+      }
+    } catch (error) {
+      console.error("Generate vaccinations report error:", error);
+      res.status(500).json({ message: "Failed to generate vaccinations report" });
+    }
+  });
+
+  app.get("/api/reports/overdue", requireAuth, async (req, res) => {
+    try {
+      const { format = 'csv' } = req.query;
+      const patients = await storage.getAllPatients(1000, 0);
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Get overdue patients - those who have scheduled vaccinations past due date
+      const overdueData = [];
+      for (const patient of patients) {
+        const vaccinations = await storage.getVaccinationsByPatient(patient.id);
+        const overdue = vaccinations.filter(v => 
+          v.scheduledDate && v.scheduledDate < today && v.status === 'scheduled'
+        );
+        
+        if (overdue.length > 0) {
+          overdueData.push({
+            ...patient,
+            overdueVaccinations: overdue
+          });
+        }
+      }
+      
+      if (format === 'csv') {
+        const csvHeader = 'Patient ID,Patient Name,Phone,Scheduled Date,Days Overdue,Status\n';
+        const csvData = overdueData.flatMap(p => 
+          p.overdueVaccinations.map((v: any) => {
+            const daysOverdue = Math.floor((new Date().getTime() - new Date(v.scheduledDate).getTime()) / (1000 * 60 * 60 * 24));
+            return `${p.patientId},"${p.name}","${p.phone || 'N/A'}","${v.scheduledDate}",${daysOverdue},"${v.status}"`;
+          })
+        ).join('\n');
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="overdue_vaccinations_report.csv"');
+        res.send(csvHeader + csvData);
+      } else {
+        res.json(overdueData);
+      }
+    } catch (error) {
+      console.error("Generate overdue report error:", error);
+      res.status(500).json({ message: "Failed to generate overdue report" });
+    }
+  });
+
+  app.get("/api/reports/demographics", requireAuth, async (req, res) => {
+    try {
+      const { format = 'csv' } = req.query;
+      const patients = await storage.getAllPatients(1000, 0);
+      
+      // Calculate demographics
+      const demographics = {
+        byAgeGroup: patients.reduce((acc, p) => {
+          const ageGroup = p.ageGroup || 'Unknown';
+          acc[ageGroup] = (acc[ageGroup] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+        byGender: patients.reduce((acc, p) => {
+          const gender = p.gender || 'Unknown';
+          acc[gender] = (acc[gender] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+        total: patients.length
+      };
+      
+      if (format === 'csv') {
+        let csvData = 'Demographic Type,Category,Count\n';
+        
+        Object.entries(demographics.byAgeGroup).forEach(([ageGroup, count]) => {
+          csvData += `Age Group,"${ageGroup}",${count}\n`;
+        });
+        
+        Object.entries(demographics.byGender).forEach(([gender, count]) => {
+          csvData += `Gender,"${gender}",${count}\n`;
+        });
+        
+        csvData += `Total,All Patients,${demographics.total}\n`;
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="demographics_report.csv"');
+        res.send(csvData);
+      } else {
+        res.json(demographics);
+      }
+    } catch (error) {
+      console.error("Generate demographics report error:", error);
+      res.status(500).json({ message: "Failed to generate demographics report" });
+    }
+  });
+
+  app.get("/api/reports/monthly", requireAuth, async (req, res) => {
+    try {
+      const { format = 'csv', year, month } = req.query;
+      const currentDate = new Date();
+      const targetYear = year ? parseInt(year as string) : currentDate.getFullYear();
+      const targetMonth = month ? parseInt(month as string) : currentDate.getMonth() + 1;
+      
+      const patients = await storage.getAllPatients(1000, 0);
+      const vaccinations = await storage.getAllVaccinations();
+      
+      // Filter data for the specified month
+      const monthlyPatients = patients.filter(p => {
+        if (!p.createdAt) return false;
+        const createdDate = new Date(p.createdAt);
+        return createdDate.getFullYear() === targetYear && createdDate.getMonth() + 1 === targetMonth;
+      });
+      
+      const monthlyVaccinations = vaccinations.filter((v: any) => {
+        if (!v.administeredDate) return false;
+        const adminDate = new Date(v.administeredDate);
+        return adminDate.getFullYear() === targetYear && adminDate.getMonth() + 1 === targetMonth;
+      });
+      
+      const monthlyStats = {
+        period: `${targetYear}-${targetMonth.toString().padStart(2, '0')}`,
+        newPatients: monthlyPatients.length,
+        vaccinationsGiven: monthlyVaccinations.length,
+        totalPatients: patients.length,
+        completionRate: patients.length > 0 ? ((monthlyVaccinations.length / patients.length) * 100).toFixed(1) : '0'
+      };
+      
+      if (format === 'csv') {
+        const csvData = `Monthly Report for ${monthlyStats.period}\n\n` +
+          `Metric,Value\n` +
+          `New Patients Registered,${monthlyStats.newPatients}\n` +
+          `Vaccinations Given,${monthlyStats.vaccinationsGiven}\n` +
+          `Total Patients,${monthlyStats.totalPatients}\n` +
+          `Completion Rate,${monthlyStats.completionRate}%\n`;
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="monthly_report_${monthlyStats.period}.csv"`);
+        res.send(csvData);
+      } else {
+        res.json(monthlyStats);
+      }
+    } catch (error) {
+      console.error("Generate monthly report error:", error);
+      res.status(500).json({ message: "Failed to generate monthly report" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
